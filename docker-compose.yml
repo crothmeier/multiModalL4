@@ -24,6 +24,7 @@ services:
     build: ./services/vllm-general
     image: multimodal-stack/vllm-general:latest
     command:
+      - --served-model-name=mistral
       - --model=/models/mistral-awq
       - --tokenizer=mistralai/Mistral-7B-Instruct-v0.2
       - --trust-remote-code
