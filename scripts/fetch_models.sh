@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -euo pipefail
 
 # Model fetch script with verified SHA-256 hashes
@@ -26,7 +26,7 @@ download_model() {
     local url="$1"
     local output="$2"
     local expected_sha="$3"
-    
+
     if [ -f "$output" ]; then
         echo "→ Checking existing $output..."
         if echo "$expected_sha  $output" | sha256sum -c - >/dev/null 2>&1; then
@@ -36,14 +36,14 @@ download_model() {
         echo "  ⚠️  Invalid checksum, re-downloading..."
         rm -f "$output"
     fi
-    
+
     echo "→ Downloading $(basename "$output")..."
     if command -v aria2c >/dev/null 2>&1; then
         aria2c -x 16 -s 16 -k 1M --console-log-level=warn -o "$output" "$url"
     else
         wget --progress=bar:force -O "$output" "$url"
     fi
-    
+
     echo "→ Verifying checksum..."
     echo "$expected_sha  $output" | sha256sum -c -
 }

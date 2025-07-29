@@ -25,7 +25,7 @@ services:
     build: ./services/vllm-general
     image: multimodal-stack/vllm-general:latest
     command:
-      - --model=/models/mistral-7b-instruct-v0.2-awq.safetensors
+      - --model=/models/mistral-awq/model.safetensors
       - --tokenizer=mistralai/Mistral-7B-Instruct-v0.2
       - --max-model-len=8192
       - --gpu-memory-utilization=0.50
@@ -37,7 +37,7 @@ services:
     build: ./services/vllm-code
     image: multimodal-stack/vllm-code:latest
     command:
-      - --model=/models/deepseek-coder-6.7b-gptq.safetensors
+      - --model=/models/deepseek-gptq/model.safetensors
       - --tokenizer=deepseek-ai/deepseek-coder-6.7b-instruct
       - --max-model-len=8192
       - --gpu-memory-utilization=0.35
