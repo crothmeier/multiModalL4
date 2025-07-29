@@ -5,6 +5,7 @@ x-vllm-base: &vllm-base
   environment:
     NVIDIA_VISIBLE_DEVICES: all
     NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    HF_TOKEN: ${HF_TOKEN:-}
   volumes:
     - /mnt/models:/models:ro
   deploy:
@@ -25,8 +26,10 @@ services:
     build: ./services/vllm-general
     image: multimodal-stack/vllm-general:latest
     command:
-      - --model=/models/mistral-awq/model.safetensors
+      - --model=/models/mistral-awq
       - --tokenizer=mistralai/Mistral-7B-Instruct-v0.2
+      - --trust-remote-code
+      - --download-dir=/models
       - --max-model-len=8192
       - --gpu-memory-utilization=0.50
       - --host=0.0.0.0
@@ -37,8 +40,10 @@ services:
     build: ./services/vllm-code
     image: multimodal-stack/vllm-code:latest
     command:
-      - --model=/models/deepseek-gptq/model.safetensors
+      - --model=/models/deepseek-gptq
       - --tokenizer=deepseek-ai/deepseek-coder-6.7b-instruct
+      - --trust-remote-code
+      - --download-dir=/models
       - --max-model-len=8192
       - --gpu-memory-utilization=0.35
       - --host=0.0.0.0
@@ -50,6 +55,8 @@ services:
     image: multimodal-stack/vllm-vl:latest
     command:
       - --model=/models/deepseek-vl-1.3b-chat
+      - --trust-remote-code
+      - --download-dir=/models
       - --gpu-memory-utilization=0.25
       - --host=0.0.0.0
       - --port=8000

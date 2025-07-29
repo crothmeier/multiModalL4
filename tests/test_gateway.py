@@ -1,4 +1,5 @@
 """Tests for API gateway."""
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,8 +8,10 @@ from fastapi.testclient import TestClient
 def client():
     """Create test client."""
     import sys
+
     sys.path.append("services/api-gateway/app")
     from main import app
+
     return TestClient(app)
 
 

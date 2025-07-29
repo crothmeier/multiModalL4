@@ -1,4 +1,5 @@
 """API Gateway for multimodal LLM services."""
+
 import os
 from typing import Dict, Optional, Set
 
@@ -51,18 +52,20 @@ async def proxy_request(path: str, request: Request):
         if path.startswith(route_pattern.strip("/")):
             target = service_url
             break
-    
+
     if not target:
-        raise HTTPException(status_code=404, detail=f"No backend configured for route: /{path}")
-    
+        raise HTTPException(
+            status_code=404, detail=f"No backend configured for route: /{path}"
+        )
+
     # JWT validation (stub for now)
-    jwt_claims = await validate_jwt(request)
-    
+    await validate_jwt(request)
+
     # Forward request
     body = await request.body()
     headers = dict(request.headers)
     headers.pop("host", None)  # Remove host header
-    
+
     async with httpx.AsyncClient(timeout=120.0) as client:
         try:
             response = await client.request(
@@ -71,19 +74,22 @@ async def proxy_request(path: str, request: Request):
                 content=body,
                 headers=headers,
             )
-            
+
             # Filter response headers
             filtered_headers = {
-                k: v for k, v in response.headers.items()
+                k: v
+                for k, v in response.headers.items()
                 if k.lower() in ALLOWED_RESPONSE_HEADERS
             }
             # Add backend identifier for tracing
             filtered_headers["x-backend"] = target.split(":")[0]
-            
+
             return JSONResponse(
                 content=response.json(),
                 status_code=response.status_code,
                 headers=filtered_headers,
             )
         except httpx.RequestError as e:
-            raise HTTPException(status_code=503, detail=f"Backend unavailable: {str(e)}")
+            raise HTTPException(
+                status_code=503, detail=f"Backend unavailable: {str(e)}"
+            )
