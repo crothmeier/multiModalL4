@@ -1,3 +1,5 @@
+version: "3.9"
+
 x-vllm-base: &vllm-base
   runtime: nvidia
   environment:
@@ -33,35 +35,36 @@ services:
       - --host=0.0.0.0
       - --port=8000
 
-  specialized-llm:
+  code-llm:
     <<: *vllm-base
-    build: ./services/vllm-specialized
-    image: multimodal-stack/vllm-specialized:latest
-    ports:
-      - "8001:8001"
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
-      - CUDA_VISIBLE_DEVICES=0
-      - VLLM_ATTENTION_BACKEND=FLASHINFER
+    build: ./services/vllm-code
+    image: multimodal-stack/vllm-code:latest
     command:
-      - --served-model-name=coder
-      - --served-model-name=llava
       - --model=/models/deepseek-gptq
       - --tokenizer=deepseek-ai/deepseek-coder-6.7b-instruct
       - --quantization=gptq
-      - --dtype=half
+      - --dtype=float16
       - --trust-remote-code
+      - --download-dir=/models
       - --max-model-len=4096
-      - --gpu-memory-utilization=0.45
-      - --enable-chunked-prefill
-      - --max-num-batched-tokens=2048
+      - --gpu-memory-utilization=0.30
       - --host=0.0.0.0
-      - --port=8001
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - --port=8000
+
+  vl-llm:
+    <<: *vllm-base
+    build: ./services/vllm-vl
+    image: multimodal-stack/vllm-vl:latest
+    command:
+      - --model=/models/deepseek-vl-1.3b-chat
+      - --trust-remote-code
+      - --download-dir=/models
+      - --tokenizer-mode=auto
+      - --max-model-len=2048
+      - --gpu-memory-utilization=0.20
+      - --disable-custom-all-reduce
+      - --host=0.0.0.0
+      - --port=8000
 
   api:
     build: ./services/api-gateway
@@ -71,11 +74,12 @@ services:
     environment:
       ROUTES: |
         /chat/completions -> general-llm:8000/v1
-        /code/completions -> specialized-llm:8001/v1
-        /vision/completions -> specialized-llm:8001/v1
+        /code/completions -> code-llm:8000/v1
+        /vision/completions -> vl-llm:8000/v1
     depends_on:
       - general-llm
-      - specialized-llm
+      - code-llm
+      - vl-llm
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s

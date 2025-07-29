@@ -1,0 +1,3 @@
+NAME                             IMAGE                                      COMMAND                  SERVICE           CREATED         STATUS                   PORTS
+multimodall4-general-llm-1       multimodal-stack/vllm-general:latest       "python3 -m vllm.ent…"   general-llm       4 minutes ago   Up 4 minutes (healthy)
+multimodall4-specialized-llm-1   multimodal-stack/vllm-specialized:latest   "python3 -m vllm.ent…"   specialized-llm   3 minutes ago   Up 3 minutes (healthy)   0.0.0.0:8001->8001/tcp

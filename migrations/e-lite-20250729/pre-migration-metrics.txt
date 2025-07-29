@@ -1,0 +1,5 @@
+CONTAINER ID   NAME                         CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O        PIDS
+ba7ac9c35e1a   multimodall4-code-llm-1      4.33%     5.384GiB / 94.04GiB   5.72%     16.4kB / 7kB      0B / 1.15MB      127
+7dfe071594ca   multimodall4-api-1           0.14%     36.37MiB / 94.04GiB   0.04%     4.77kB / 3.41kB   0B / 0B          2
+0034943c6763   multimodall4-general-llm-1   1.13%     5.364GiB / 94.04GiB   5.70%     2.36MB / 34.2kB   0B / 3.73MB      128
+716d4620b97b   minio                        0.00%     220.7MiB / 94.04GiB   0.23%     0B / 0B           116MB / 11.5MB   29
