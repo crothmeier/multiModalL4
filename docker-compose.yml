@@ -42,10 +42,12 @@ services:
     command:
       - --model=/models/deepseek-gptq
       - --tokenizer=deepseek-ai/deepseek-coder-6.7b-instruct
+      - --quantization=gptq
+      - --dtype=float16
       - --trust-remote-code
       - --download-dir=/models
-      - --max-model-len=8192
-      - --gpu-memory-utilization=0.35
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.30
       - --host=0.0.0.0
       - --port=8000
 
@@ -57,7 +59,10 @@ services:
       - --model=/models/deepseek-vl-1.3b-chat
       - --trust-remote-code
       - --download-dir=/models
-      - --gpu-memory-utilization=0.25
+      - --tokenizer-mode=auto
+      - --max-model-len=2048
+      - --gpu-memory-utilization=0.20
+      - --disable-custom-all-reduce
       - --host=0.0.0.0
       - --port=8000
 
