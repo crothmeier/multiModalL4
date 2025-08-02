@@ -1,0 +1,7 @@
+---
+# Development environment variables
+node_env: development
+log_level: debug
+jwt_algorithm: HS256
+jwt_audience: llm-platform-dev
+jwt_issuer: multimodal-stack-dev

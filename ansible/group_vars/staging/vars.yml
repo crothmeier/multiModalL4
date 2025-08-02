@@ -1,0 +1,7 @@
+---
+# Staging environment variables
+node_env: staging
+log_level: info
+jwt_algorithm: HS256
+jwt_audience: llm-platform-staging
+jwt_issuer: multimodal-stack-staging

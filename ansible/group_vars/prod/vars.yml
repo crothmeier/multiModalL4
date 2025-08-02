@@ -1,0 +1,7 @@
+---
+# Production environment variables
+node_env: production
+log_level: warn
+jwt_algorithm: RS256
+jwt_audience: llm-platform
+jwt_issuer: multimodal-stack
