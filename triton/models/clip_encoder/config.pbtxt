@@ -1,0 +1,57 @@
+name: "clip_encoder"
+platform: "onnxruntime_onnx"
+max_batch_size: 32
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP16
+    dims: [3, 336, 336]
+  }
+]
+output [
+  {
+    name: "image_features"
+    data_type: TYPE_FP16
+    dims: [1024, 49]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [4, 8, 16]
+  max_queue_delay_microseconds: 100
+  preserve_ordering: true
+}
+
+optimization {
+  execution_accelerators {
+    gpu_execution_accelerator: [
+      {
+        name: "tensorrt"
+        parameters { key: "precision_mode" value: "FP16" }
+        parameters { key: "max_workspace_size_bytes" value: "1073741824" }
+      }
+    ]
+  }
+}
+
+model_warmup [
+  {
+    name: "warmup"
+    batch_size: 8
+    inputs {
+      key: "images"
+      value: {
+        data_type: TYPE_FP16
+        dims: [3, 336, 336]
+        random_data: true
+      }
+    }
+  }
+]

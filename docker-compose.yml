@@ -1,5 +1,4 @@
 version: "3.8"
-
 x-vllm-base: &vllm-base
   image: vllm/vllm-openai:v0.6.3.post1
   volumes:
@@ -7,7 +6,6 @@ x-vllm-base: &vllm-base
     - vllm-cache:/root/.cache/huggingface
   environment:
     - HF_TOKEN=${HF_TOKEN:?Error: HF_TOKEN environment variable is required}
-    - CUDA_VISIBLE_DEVICES=0
   deploy:
     resources:
       reservations:
@@ -17,7 +15,6 @@ x-vllm-base: &vllm-base
             capabilities: [gpu]
   restart: "no" # Important: orchestrator manages lifecycle
   network_mode: bridge
-
 services:
   model-orchestrator:
     build: ./services/model-orchestrator
@@ -36,9 +33,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-
   mistral-llm:
-    <<: *vllm-base
+    !!merge <<: *vllm-base
     container_name: multimodal-stack-mistral-llm-1
     command:
       - --model=/models/mistral-awq
@@ -48,10 +44,9 @@ services:
       - --host=0.0.0.0
       - --port=8000
     ports:
-      - "8000:8000"
-
+      - "8001:8000"
   llava-llm:
-    <<: *vllm-base
+    !!merge <<: *vllm-base
     container_name: multimodal-stack-llava-llm-1
     command:
       - --model=/models/llava-7b
@@ -67,22 +62,21 @@ services:
       - --host=0.0.0.0
       - --port=8000
     ports:
-      - "8000:8000"
-
+      - "8002:8000"
   coder-llm:
-    <<: *vllm-base
+    !!merge <<: *vllm-base
     container_name: multimodal-stack-coder-llm-1
     command:
-      - --model=/models/deepseek-coder-6.7b-gptq
-      - --served-model-name=coder,deepseek
+      - --model=/models/deepseek-gptq
+      - --served-model-name=coder
       - --quantization=gptq
+      - --dtype=float16
       - --max-model-len=4096
       - --gpu-memory-utilization=0.85
       - --host=0.0.0.0
       - --port=8000
     ports:
       - "8000:8000"
-
   api-gateway:
     build: ./services/api-gateway
     container_name: multimodal-stack-gateway
@@ -96,10 +90,8 @@ services:
       - model-orchestrator
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
 volumes:
   vllm-cache:
-
 networks:
   default:
     name: multimodal-stack

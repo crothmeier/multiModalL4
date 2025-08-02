@@ -1,0 +1,106 @@
+# TensorRT-LLM Environment for LLaVA FP8 Quantization
+# Optimized for NVIDIA L4 GPU with Ada Lovelace architecture
+
+FROM nvcr.io/nvidia/tensorrt:24.01-py3
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV TRT_LIBPATH=/usr/lib/x86_64-linux-gnu
+ENV LD_LIBRARY_PATH=${TRT_LIBPATH}:${LD_LIBRARY_PATH}
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    git \
+    wget \
+    vim \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    build-essential \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install Python dependencies
+RUN pip3 install --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA 12.1 support for L4
+RUN pip3 install torch==2.2.0 torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install TensorRT-LLM and dependencies
+RUN pip3 install tensorrt==9.2.0.post12.dev5 \
+    cuda-python \
+    mpi4py \
+    polygraphy \
+    onnx \
+    onnxruntime-gpu
+
+# Install Transformers and model-specific dependencies
+RUN pip3 install \
+    transformers==4.37.2 \
+    accelerate==0.26.1 \
+    sentencepiece \
+    protobuf \
+    datasets \
+    evaluate \
+    rouge_score \
+    nltk \
+    py7zr \
+    scipy \
+    scikit-learn \
+    pynvml \
+    gputil \
+    psutil \
+    prometheus-client \
+    flask \
+    gunicorn \
+    requests \
+    pillow \
+    tqdm \
+    pydantic
+
+# Install Triton client for inference
+RUN pip3 install tritonclient[all]
+
+# Clone and install TensorRT-LLM from source for latest FP8 support
+RUN git clone https://github.com/NVIDIA/TensorRT-LLM.git /workspace/TensorRT-LLM && \
+    cd /workspace/TensorRT-LLM && \
+    git checkout v0.8.0 && \
+    pip3 install -e .
+
+# Create working directories
+RUN mkdir -p /workspace/scripts \
+    /workspace/models \
+    /workspace/engines \
+    /workspace/calibration \
+    /workspace/configs \
+    /workspace/logs
+
+# Copy quantization scripts
+COPY scripts/convert_to_fp8.py /workspace/scripts/
+COPY scripts/health_check.py /workspace/scripts/
+COPY scripts/monitor.py /workspace/scripts/
+
+# Set up model paths
+ENV MODEL_PATH=/mnt/models/llava-7b
+ENV ENGINE_PATH=/mnt/engines/llava-fp8
+ENV TRITON_MODEL_REPO=/mnt/models/triton
+
+# Create volume mount points
+VOLUME ["/mnt/models", "/mnt/engines", "/workspace/logs"]
+
+# Set working directory
+WORKDIR /workspace
+
+# Health check command
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 /workspace/scripts/health_check.py || exit 1
+
+# Default command - run quantization
+CMD ["python3", "/workspace/scripts/convert_to_fp8.py"]

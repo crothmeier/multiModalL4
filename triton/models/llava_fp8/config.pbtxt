@@ -1,0 +1,195 @@
+# CI test: corrected Triton image tag
+name: "llava_fp8"
+backend: "tensorrtllm"
+max_batch_size: 16
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT32
+    dims: [-1]
+  },
+  {
+    name: "attention_mask"
+    data_type: TYPE_INT32
+    dims: [-1]
+  },
+  {
+    name: "image_features"
+    data_type: TYPE_FP16
+    dims: [1024, 49]
+    optional: true
+  }
+]
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP16
+    dims: [-1, 32000]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [1, 2, 4, 8]
+  max_queue_delay_microseconds: 50
+  preserve_ordering: false
+  priority_levels: 3
+  default_priority_level: 1
+
+  priority_queue_policy {
+    key: 1
+    value: {
+      timeout_action: REJECT
+      default_timeout_microseconds: 500000
+      max_queue_size: 100
+    }
+  }
+  priority_queue_policy {
+    key: 2
+    value: {
+      timeout_action: DELAY
+      default_timeout_microseconds: 1000000
+      max_queue_size: 50
+    }
+  }
+}
+
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [0, 1]
+        }
+      ]
+    },
+    {
+      name: "END"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
+          int32_false_true: [0, 1]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [0, 1]
+        }
+      ]
+    }
+  ]
+
+  state [
+    {
+      input_name: "cache_k"
+      output_name: "cache_k_out"
+      data_type: TYPE_FP8E4M3
+      dims: [32, -1, 128]
+    },
+    {
+      input_name: "cache_v"
+      output_name: "cache_v_out"
+      data_type: TYPE_FP8E4M3
+      dims: [32, -1, 128]
+    }
+  ]
+}
+
+# Triton 24.06+ syntax for FP8 optimization
+backend_parameters [
+  {
+    key: "cuda_graph.capture"
+    value: "true"
+  },
+  {
+    key: "cuda_graph.enable"
+    value: "true"
+  }
+]
+
+optimization {
+  execution_accelerators {
+    gpu_execution_accelerator: [
+      {
+        name: "tensorrt"
+        parameters { key: "precision_mode" value: "FP8" }
+        parameters { key: "max_workspace_size_bytes" value: "8589934592" }
+      }
+    ]
+  }
+
+  input_pinned_memory {
+    enable: true
+  }
+
+  output_pinned_memory {
+    enable: true
+  }
+}
+
+model_warmup [
+  {
+    name: "warmup_short"
+    batch_size: 1
+    inputs {
+      key: "input_ids"
+      value: {
+        data_type: TYPE_INT32
+        dims: [128]
+        random_data: true
+      }
+    }
+    inputs {
+      key: "attention_mask"
+      value: {
+        data_type: TYPE_INT32
+        dims: [128]
+        zero_data: false
+      }
+    }
+  },
+  {
+    name: "warmup_long"
+    batch_size: 8
+    inputs {
+      key: "input_ids"
+      value: {
+        data_type: TYPE_INT32
+        dims: [512]
+        random_data: true
+      }
+    }
+    inputs {
+      key: "attention_mask"
+      value: {
+        data_type: TYPE_INT32
+        dims: [512]
+        zero_data: false
+      }
+    }
+  }
+]
+
+# Updated parameters for Triton 24.06+ and FP8 KV-cache
+parameters [
+  { key: "enable_kv_cache_reuse", value: { string_value: "true" } },
+  { key: "kv_cache_type", value: { string_value: "paged" } },
+  { key: "kv_cache_dtype", value: { string_value: "fp16" } },  # FP8 KV-cache is beta in TRT-LLM 0.9.1; expect ~1% perplexity drift until 0.9.3
+  { key: "gpu_memory_usage", value: { string_value: "0.85" } },
+  { key: "enable_memory_mapping", value: { string_value: "true" } },
+  { key: "max_num_seqs", value: { string_value: "8" } },  # L4 bandwidth optimization
+  { key: "block_size", value: { string_value: "32" } }
+]

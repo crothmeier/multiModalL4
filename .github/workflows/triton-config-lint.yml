@@ -1,0 +1,22 @@
+name: Triton Model-Config Lint
+
+on:
+  push:
+    paths:
+      - "triton/models/**/config.pbtxt"
+  pull_request:
+    paths:
+      - "triton/models/**/config.pbtxt"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run CI config validation
+        run: |
+          bash ci/check_triton_config_ci.sh triton/models

@@ -54,22 +54,32 @@ async def proxy_completions(request: Request):
 
         # Proxy to LLM
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{LLM_URL}/v1/chat/completions",
-                json=body,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                timeout=300.0,
-                stream=body.get("stream", False),
-            )
-
             if body.get("stream", False):
-                return StreamingResponse(
-                    stream_response(response), media_type="text/event-stream"
-                )
+                # Use stream() method for streaming responses
+                async with client.stream(
+                    "POST",
+                    f"{LLM_URL}/v1/chat/completions",
+                    json=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    timeout=300.0,
+                ) as response:
+                    return StreamingResponse(
+                        stream_response(response), media_type="text/event-stream"
+                    )
             else:
+                # Use regular post for non-streaming
+                response = await client.post(
+                    f"{LLM_URL}/v1/chat/completions",
+                    json=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    timeout=300.0,
+                )
                 return JSONResponse(content=response.json())
 
     except httpx.ReadTimeout:

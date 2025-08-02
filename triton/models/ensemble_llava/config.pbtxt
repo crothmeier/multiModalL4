@@ -1,0 +1,103 @@
+name: "ensemble_llava"
+platform: "ensemble"
+max_batch_size: 16
+
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP16
+    dims: [3, 336, 336]
+  },
+  {
+    name: "prompt"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+
+output [
+  {
+    name: "generated_text"
+    data_type: TYPE_STRING
+    dims: [1]
+  },
+  {
+    name: "confidence_scores"
+    data_type: TYPE_FP32
+    dims: [-1]
+    optional: true
+  }
+]
+
+ensemble_scheduling {
+  step [
+    {
+      model_name: "clip_encoder"
+      model_version: -1
+      input_map {
+        key: "images"
+        value: "images"
+      }
+      output_map {
+        key: "image_features"
+        value: "clip_features"
+      }
+    },
+    {
+      model_name: "llava_preprocessor"
+      model_version: -1
+      input_map {
+        key: "prompt"
+        value: "prompt"
+      }
+      input_map {
+        key: "image_features"
+        value: "clip_features"
+      }
+      output_map {
+        key: "input_ids"
+        value: "model_input_ids"
+      }
+      output_map {
+        key: "attention_mask"
+        value: "model_attention_mask"
+      }
+    },
+    {
+      model_name: "llava_fp8"
+      model_version: -1
+      input_map {
+        key: "input_ids"
+        value: "model_input_ids"
+      }
+      input_map {
+        key: "attention_mask"
+        value: "model_attention_mask"
+      }
+      input_map {
+        key: "image_features"
+        value: "clip_features"
+      }
+      output_map {
+        key: "logits"
+        value: "raw_logits"
+      }
+    },
+    {
+      model_name: "llava_postprocessor"
+      model_version: -1
+      input_map {
+        key: "logits"
+        value: "raw_logits"
+      }
+      output_map {
+        key: "generated_text"
+        value: "generated_text"
+      }
+      output_map {
+        key: "confidence_scores"
+        value: "confidence_scores"
+      }
+    }
+  ]
+}

@@ -41,12 +41,12 @@ else
     current_hf=""
 fi
 
-need_hf='HF_TOKEN=${HF_TOKEN:?Error: HF_TOKEN environment variable is required}'
+need_hf="HF_TOKEN=\${HF_TOKEN:?Error: HF_TOKEN environment variable is required}"
 if [ "$current_hf" != "$need_hf" ]; then
     echo "Updating HF_TOKEN requirement..."
-    # Replace the HF_TOKEN line in the environment array
-    yq eval '.["x-vllm-base"].environment = (.["x-vllm-base"].environment | map(if test("^HF_TOKEN=") then "'"$need_hf"'" else . end))' "$COMPOSE_FILE" > "$TEMP_FILE"
-    mv "$TEMP_FILE" "$COMPOSE_FILE"
+    # Update HF_TOKEN in the environment array
+    yq eval '."x-vllm-base".environment |= map(select(test("^HF_TOKEN=") | not))' -i "$COMPOSE_FILE"
+    yq eval ".\"x-vllm-base\".environment += [\"$need_hf\"]" -i "$COMPOSE_FILE"
     CHANGES_MADE=1
 fi
 

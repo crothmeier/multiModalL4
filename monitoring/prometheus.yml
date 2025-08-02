@@ -1,0 +1,104 @@
+# Prometheus configuration for LLaVA FP8 monitoring
+# Updated for Triton 24.06 metric names
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: "llava-fp8-prod"
+    gpu_type: "nvidia-l4"
+    quantization: "fp8"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules files
+rule_files:
+  - "/etc/prometheus/alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Triton Inference Server metrics
+  - job_name: "triton"
+    static_configs:
+      - targets: ["localhost:8002"]
+    metric_relabel_configs:
+      # Update old metric names to new Triton 24.06 format
+      - source_labels: [__name__]
+        regex: "llava_fp8_accuracy_ratio"
+        target_label: __name__
+        replacement: "triton_inference_accuracy_ratio"
+
+      - source_labels: [__name__]
+        regex: "nv_inference_request_success"
+        target_label: __name__
+        replacement: "triton_request_success_total"
+
+      - source_labels: [__name__]
+        regex: "nv_inference_request_failure"
+        target_label: __name__
+        replacement: "triton_request_failure_total"
+
+      - source_labels: [__name__]
+        regex: "nv_inference_compute_infer_duration_us"
+        target_label: __name__
+        replacement: "triton_inference_compute_duration_us"
+
+      - source_labels: [__name__]
+        regex: "nv_gpu_memory_used_bytes"
+        target_label: __name__
+        replacement: "triton_gpu_memory_bytes"
+
+  # vLLM metrics (if using vLLM backend)
+  - job_name: "vllm"
+    static_configs:
+      - targets: ["localhost:8000"]
+    metrics_path: "/metrics"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "vllm-llava-fp8"
+
+  # API Gateway metrics
+  - job_name: "gateway"
+    static_configs:
+      - targets: ["api-gateway:9091"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "llava-gateway"
+
+  # Health monitor metrics
+  - job_name: "health-monitor"
+    static_configs:
+      - targets: ["health-monitor:9092"]
+
+  # Node exporter for system metrics
+  - job_name: "node"
+    static_configs:
+      - targets: ["localhost:9100"]
+
+  # NVIDIA GPU exporter
+  - job_name: "nvidia-gpu"
+    static_configs:
+      - targets: ["localhost:9835"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "l4-gpu"
+
+  # Redis exporter
+  - job_name: "redis"
+    static_configs:
+      - targets: ["localhost:9121"]
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "http://prometheus-storage:9090/api/v1/write"
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: '.*_temp.*'
+#         action: drop

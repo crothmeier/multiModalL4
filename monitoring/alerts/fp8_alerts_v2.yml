@@ -1,0 +1,194 @@
+# Alert rules for LLaVA FP8 deployment
+# Updated for Triton 24.06 and vLLM 0.8.4
+
+groups:
+  - name: fp8_performance
+    interval: 30s
+    rules:
+      # FP8 Accuracy Monitoring
+      - alert: FP8AccuracyDegradation
+        expr: triton_inference_accuracy_ratio{model="llava_fp8"} < 0.95
+        for: 5m
+        labels:
+          severity: critical
+          component: model
+        annotations:
+          summary: "FP8 model accuracy below threshold ({{ $value | humanizePercentage }})"
+          description: "LLaVA FP8 accuracy has dropped below 95% threshold. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki/runbooks/fp8-accuracy-degradation"
+          action: "Consider rolling back to FP16 model"
+
+      # Speculative Decoding Performance (correct vLLM 0.9 metric)
+      - alert: SpeculativeDecodingFailure
+        expr: vllm_spec_decode_efficiency < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: vllm
+        annotations:
+          summary: "Arctic speculator acceptance rate too low ({{ $value | humanizePercentage }})"
+          description: "Speculative decoding efficiency is {{ $value | humanizePercentage }}, below 50% threshold"
+          action: "Consider disabling speculative decoding or adjusting proposal_length"
+
+      # L4 Memory Bandwidth Monitoring (using DCGM metrics)
+      - alert: L4MemoryBandwidthSaturation
+        expr: (rate(DCGM_FI_DEV_FB_READ_THROUGHPUT[1m]) + rate(DCGM_FI_DEV_FB_WRITE_THROUGHPUT[1m])) > 300e9 * 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: gpu
+          gpu_type: l4
+        annotations:
+          summary: "L4 memory bandwidth near saturation ({{ $value | humanize }}B/s)"
+          description: "GPU memory bandwidth is {{ $value | humanize }}B/s, approaching L4's 300 GB/s limit (85% threshold)"
+          action: "Reduce batch size or enable more aggressive quantization"
+
+      # Latency SLA Violations
+      - alert: LatencySLAViolation
+        expr: histogram_quantile(0.99, rate(triton_inference_compute_duration_us[5m])) > 500000
+        for: 5m
+        labels:
+          severity: critical
+          component: inference
+          sla: p99_500ms
+        annotations:
+          summary: "P99 latency exceeds 500ms SLA"
+          description: "99th percentile latency is {{ $value | humanizeDuration }}, exceeding 500ms target"
+          impact: "User experience degradation"
+          action: "Scale horizontally or reduce model complexity"
+
+      # Throughput SLA Violations
+      - alert: ThroughputBelowTarget
+        expr: rate(triton_request_success_total[5m]) < 100
+        for: 10m
+        labels:
+          severity: warning
+          component: inference
+          sla: throughput_100rps
+        annotations:
+          summary: "Throughput below 100 req/s target"
+          description: "Current throughput: {{ $value | humanize }} req/s"
+          action: "Check for bottlenecks in preprocessing or network"
+
+      # GPU Memory Issues
+      - alert: GPUMemoryHighUsage
+        expr: (triton_gpu_memory_bytes / (24 * 1024 * 1024 * 1024)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: gpu
+        annotations:
+          summary: "GPU memory usage above 90% ({{ $value | humanizePercentage }})"
+          description: "L4 GPU memory usage is critical, only {{ 24 - ($value * 24) | humanize }}GB free"
+          action: "Reduce batch size or clear model cache"
+
+      # FP8 KV-Cache Issues
+      - alert: FP8KVCacheError
+        expr: increase(vllm_kv_cache_allocation_failures[5m]) > 0
+        labels:
+          severity: critical
+          component: vllm
+          feature: fp8_kvcache
+        annotations:
+          summary: "FP8 KV-cache allocation failures detected"
+          description: "{{ $value }} KV-cache allocation failures in last 5 minutes"
+          action: "Revert to FP16 KV-cache or reduce max_num_seqs"
+
+      # Error Rate Monitoring
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(triton_request_failure_total[5m]) /
+            (rate(triton_request_success_total[5m]) + rate(triton_request_failure_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: inference
+        annotations:
+          summary: "Error rate exceeds 5% ({{ $value | humanizePercentage }})"
+          description: "Inference error rate is {{ $value | humanizePercentage }}"
+          action: "Check logs for model loading or OOM errors"
+
+      # Queue Depth Monitoring
+      - alert: InferenceQueueBacklog
+        expr: triton_inference_queue_size > 100
+        for: 3m
+        labels:
+          severity: warning
+          component: inference
+        annotations:
+          summary: "Inference queue depth high ({{ $value }})"
+          description: "{{ $value }} requests queued, may indicate processing bottleneck"
+          action: "Scale inference workers or optimize model"
+
+  - name: fp8_availability
+    interval: 30s
+    rules:
+      # Service Health
+      - alert: TritonServerDown
+        expr: up{job="triton"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: triton
+        annotations:
+          summary: "Triton inference server is down"
+          description: "Triton server has been unreachable for 1 minute"
+          action: "Check container logs and restart if necessary"
+
+      - alert: GatewayDown
+        expr: up{job="gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "API gateway is down"
+          description: "Gateway has been unreachable for 1 minute"
+          action: "Check gateway container and network connectivity"
+
+      # Model Loading Issues
+      - alert: ModelNotLoaded
+        expr: triton_model_loaded{model="llava_fp8"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: model
+        annotations:
+          summary: "LLaVA FP8 model not loaded"
+          description: "Model has been unloaded for 5 minutes"
+          action: "Check model repository and reload model"
+
+  - name: fp8_resource_optimization
+    interval: 60s
+    rules:
+      # Bandwidth Optimization Opportunities
+      - alert: SuboptimalBandwidthUsage
+        expr: |
+          (triton_gpu_memory_bandwidth_utilization < 0.5) and
+          (rate(triton_request_success_total[5m]) > 50)
+        for: 15m
+        labels:
+          severity: info
+          component: optimization
+        annotations:
+          summary: "GPU bandwidth underutilized"
+          description: "Bandwidth at {{ $value | humanizePercentage }} with active traffic"
+          action: "Consider increasing batch size for better efficiency"
+
+      # A/B Testing Insights
+      - alert: FP16OutperformingFP8
+        expr: |
+          (
+            histogram_quantile(0.99, rate(triton_inference_compute_duration_us{model="llava_fp16"}[5m])) <
+            histogram_quantile(0.99, rate(triton_inference_compute_duration_us{model="llava_fp8"}[5m]))
+          )
+        for: 30m
+        labels:
+          severity: warning
+          component: ab_testing
+        annotations:
+          summary: "FP16 showing better latency than FP8"
+          description: "FP16 P99 latency consistently lower than FP8 for 30 minutes"
+          action: "Review FP8 quantization calibration and consider rollback"
