@@ -1,3 +1,4 @@
+# CI test: corrected Triton image tag
 name: "llava_fp8"
 backend: "tensorrtllm"
 max_batch_size: 16
