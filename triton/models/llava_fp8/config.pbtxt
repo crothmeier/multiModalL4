@@ -110,15 +110,16 @@ sequence_batching {
 }
 
 # Triton 24.06+ syntax for FP8 optimization
-backend_parameters {
-  key: "cuda_graph.capture"
-  value: "true"
-}
-
-backend_parameters {
-  key: "cuda_graph.enable"
-  value: "true"
-}
+backend_parameters [
+  {
+    key: "cuda_graph.capture"
+    value: "true"
+  },
+  {
+    key: "cuda_graph.enable"
+    value: "true"
+  }
+]
 
 optimization {
   execution_accelerators {
@@ -184,7 +185,7 @@ model_warmup [
 ]
 
 # Updated parameters for Triton 24.06+ and FP8 KV-cache
-parameters: [
+parameters [
   { key: "enable_kv_cache_reuse", value: { string_value: "true" } },
   { key: "kv_cache_type", value: { string_value: "paged" } },
   { key: "kv_cache_dtype", value: { string_value: "fp16" } },  # FP8 KV-cache is beta in TRT-LLM 0.9.1; expect ~1% perplexity drift until 0.9.3
