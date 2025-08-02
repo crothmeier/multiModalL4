@@ -1,133 +1,105 @@
-version: "3.9"
+version: "3.8"
 
 x-vllm-base: &vllm-base
-  runtime: nvidia
-  environment:
-    NVIDIA_VISIBLE_DEVICES: all
-    NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    HF_TOKEN: ${HF_TOKEN:-}
+  image: vllm/vllm-openai:v0.6.3.post1
   volumes:
     - /mnt/models:/models:ro
+    - vllm-cache:/root/.cache/huggingface
+  environment:
+    - HF_TOKEN=${HF_TOKEN:?Error: HF_TOKEN environment variable is required}
+    - CUDA_VISIBLE_DEVICES=0
   deploy:
     resources:
       reservations:
         devices:
-          - capabilities: [gpu]
-  security_opt:
-    - no-new-privileges:true
-  cap_drop:
-    - ALL
-  cap_add:
-    - NET_BIND_SERVICE
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  restart: "no" # Important: orchestrator manages lifecycle
+  network_mode: bridge
 
 services:
-  general-llm:
+  model-orchestrator:
+    build: ./services/model-orchestrator
+    container_name: multimodal-stack-orchestrator
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    ports:
+      - "8888:8888"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mistral-llm:
     <<: *vllm-base
-    build: ./services/vllm-general
-    image: multimodal-stack/vllm-general:latest
+    container_name: multimodal-stack-mistral-llm-1
     command:
       - --model=/models/mistral-awq
-      - --tokenizer=mistralai/Mistral-7B-Instruct-v0.2
-      - --trust-remote-code
-      - --download-dir=/models
+      - --served-model-name=mistral
       - --max-model-len=8192
-      - --gpu-memory-utilization=0.50
+      - --gpu-memory-utilization=0.85
       - --host=0.0.0.0
       - --port=8000
+    ports:
+      - "8000:8000"
 
-  code-llm:
+  llava-llm:
     <<: *vllm-base
-    build: ./services/vllm-code
-    image: multimodal-stack/vllm-code:latest
+    container_name: multimodal-stack-llava-llm-1
     command:
-      - --model=/models/deepseek-gptq
-      - --tokenizer=deepseek-ai/deepseek-coder-6.7b-instruct
-      - --quantization=gptq
-      - --dtype=float16
-      - --trust-remote-code
-      - --download-dir=/models
-      - --max-model-len=4096
-      - --gpu-memory-utilization=0.30
-      - --host=0.0.0.0
-      - --port=8000
-
-  vl-llm:
-    <<: *vllm-base
-    build: ./services/vllm-vl
-    image: multimodal-stack/vllm-vl:latest
-    command:
-      - --model=/models/deepseek-vl-1.3b-chat
+      - --model=/models/llava-7b
+      - --tokenizer=liuhaotian/llava-v1.5-7b
+      - --served-model-name=llava
       - --trust-remote-code
       - --download-dir=/models
       - --tokenizer-mode=auto
-      - --max-model-len=2048
-      - --gpu-memory-utilization=0.20
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.10
       - --disable-custom-all-reduce
+      - --image-input-type=pixel_values
       - --host=0.0.0.0
       - --port=8000
+    ports:
+      - "8000:8000"
 
-  api:
+  coder-llm:
+    <<: *vllm-base
+    container_name: multimodal-stack-coder-llm-1
+    command:
+      - --model=/models/deepseek-coder-6.7b-gptq
+      - --served-model-name=coder,deepseek
+      - --quantization=gptq
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.85
+      - --host=0.0.0.0
+      - --port=8000
+    ports:
+      - "8000:8000"
+
+  api-gateway:
     build: ./services/api-gateway
-    image: multimodal-stack/api-gateway:latest
+    container_name: multimodal-stack-gateway
     ports:
       - "8080:8080"
     environment:
-      ROUTES: |
-        /chat/completions -> general-llm:8000/v1
-        /code/completions -> code-llm:8000/v1
-        /vision/completions -> vl-llm:8000/v1
+      - ORCHESTRATOR_URL=http://model-orchestrator:8888
+      - LLM_URL=http://host.docker.internal:8000
+    restart: unless-stopped
     depends_on:
-      - general-llm
-      - code-llm
-      - vl-llm
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
+      - model-orchestrator
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-  # Whisper & Piper remain in 'full' profile - see README for usage
-  whisper:
-    image: ghcr.io/ggerganov/whisper.cpp:v1.6.1-cuda12
-    runtime: nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    volumes:
-      - /tmp/audio:/audio:ro
-    profiles:
-      - full
+volumes:
+  vllm-cache:
 
-  piper:
-    image: rhasspy/piper:1.2.0
-    volumes:
-      - ./models/piper:/home/piper/.local/share/piper/voices:ro
-    profiles:
-      - full
-
-  # Prometheus disabled until config exists (Phase 2)
-  # prometheus:
-  #   image: prom/prometheus:v2.52.0
-  #   volumes:
-  #     - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  #   ports:
-  #     - "9090:9090"
-  #   profiles:
-  #     - monitoring
-
-  dcgm:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.1-ubuntu22.04
-    runtime: nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    ports:
-      - "9400:9400"
-    profiles:
-      - monitoring
+networks:
+  default:
+    name: multimodal-stack

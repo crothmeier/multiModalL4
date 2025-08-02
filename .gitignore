@@ -1,1 +1,10 @@
 .env
+
+# --- infra & dev artefacts ---
+*.log
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+docker-compose.*.bak
+docker-compose.*.pre*

@@ -59,3 +59,14 @@ repos:
     hooks:
       - id: prettier
         types_or: [yaml, markdown]
+
+  # Local hooks
+  - repo: local
+    hooks:
+      - id: docker-compose-compliance
+        name: Validate docker-compose.yml compliance
+        entry: scripts/auto-patch-compose.sh
+        language: system
+        files: docker-compose\.yml$
+        pass_filenames: false
+        description: Ensures HF_TOKEN is required and GPU memory is optimized

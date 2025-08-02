@@ -1,0 +1,4 @@
+NAME                         IMAGE                                  COMMAND                  SERVICE       CREATED          STATUS                      PORTS
+multimodall4-api-1           multimodal-stack/api-gateway:latest    "uvicorn main:app --…"   api           37 minutes ago   Up 37 minutes (unhealthy)   0.0.0.0:8080->8080/tcp
+multimodall4-code-llm-1      multimodal-stack/vllm-code:latest      "python3 -m vllm.ent…"   code-llm      32 minutes ago   Up 32 minutes (healthy)
+multimodall4-general-llm-1   multimodal-stack/vllm-general:latest   "python3 -m vllm.ent…"   general-llm   37 minutes ago   Up 37 minutes (healthy)
