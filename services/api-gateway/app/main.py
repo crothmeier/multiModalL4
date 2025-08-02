@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Dict, Optional, Set
+from typing import Dict, Set
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 # Add parent directory to path to import route_map
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.security import get_current_user  # noqa: E402
+from app.utils import validate_path  # noqa: E402
 from route_map import resolve  # noqa: E402
 
 # Parse routing table from environment (kept for backwards compatibility)
@@ -37,22 +39,20 @@ async def health_check():
     return JSONResponse(content={"status": "ok"})
 
 
-async def validate_jwt(request: Request) -> Optional[Dict]:
-    """JWT validation stub - implement with proper verification."""
-    # TODO: Implement actual JWT validation
-    # Expected: Extract Bearer token, verify signature, check 'aud' claim
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        # Stub: In production, decode and verify JWT here
-        return {"sub": "user123", "aud": "llm-platform"}
-    return None
-
-
 @app.post("/{path:path}")
 async def proxy_request(path: str, request: Request):
     """Proxy requests to appropriate backend based on routing table."""
-    # JWT validation (stub for now)
-    await validate_jwt(request)
+
+    # Validate path to prevent traversal attacks
+    if not validate_path(path):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid path: contains forbidden characters or patterns",
+        )
+
+    # JWT validation - required for all proxied requests
+    await get_current_user(request)
+    # User info available for logging/tracing if needed
 
     # Parse request body to check for model and image content
     try:

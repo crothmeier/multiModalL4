@@ -1,0 +1,56 @@
+---
+# Ansible playbook to securely deploy JWT_SECRET and HF_TOKEN
+- name: Secure API Gateway Configuration
+  hosts: all
+  become: yes
+  vars:
+    app_user: docker
+    app_group: docker
+    stack_dir: /opt/multimodal-stack
+
+  tasks:
+    - name: Ensure stack directory exists
+      file:
+        path: "{{ stack_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Deploy secure .env file
+      template:
+        src: env.j2
+        dest: "{{ stack_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0600"
+      notify:
+        - restart api-gateway
+
+    - name: Validate .env file permissions
+      stat:
+        path: "{{ stack_dir }}/.env"
+      register: env_stat
+      failed_when: env_stat.stat.mode != '0600'
+
+    - name: Test docker-compose can read .env
+      command: docker-compose --env-file {{ stack_dir }}/.env config
+      args:
+        chdir: "{{ stack_dir }}"
+      become_user: "{{ app_user }}"
+      changed_when: false
+
+    - name: Copy docker-compose.yml
+      copy:
+        src: ../docker-compose.yml
+        dest: "{{ stack_dir }}/docker-compose.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+  handlers:
+    - name: restart api-gateway
+      systemd:
+        name: docker-compose@multimodal-stack
+        state: restarted
+      when: ansible_facts['systemd']['services']['docker-compose@multimodal-stack.service'] is defined
