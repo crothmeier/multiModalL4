@@ -17,11 +17,6 @@ jobs:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v4
 
-      - name: 📦 Pull CPU-only Triton image
-        run: docker pull nvcr.io/nvidia/tritonserver:24.06-py3-sdk
-
-      - name: 🔍 Run dry-run config validation
+      - name: 🔍 Run CI config validation
         run: |
-          bash ci/check_triton_config.sh \
-            triton/models \
-            nvcr.io/nvidia/tritonserver:24.06-py3-sdk
+          bash ci/check_triton_config_ci.sh triton/models
