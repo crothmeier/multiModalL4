@@ -1,0 +1,27 @@
+name: Triton Model-Config Lint
+
+on:
+  push:
+    paths:
+      - "triton/models/**/config.pbtxt"
+  pull_request:
+    paths:
+      - "triton/models/**/config.pbtxt"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 📦 Pull CPU-only Triton image
+        run: docker pull nvcr.io/nvidia/tritonserver:24.06.0-py3-sdk
+
+      - name: 🔍 Run dry-run config validation
+        run: |
+          bash ci/check_triton_config.sh \
+            triton/models \
+            nvcr.io/nvidia/tritonserver:24.06.0-py3-sdk

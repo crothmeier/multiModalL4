@@ -1,0 +1,309 @@
+version: "3.9"
+
+services:
+  # FP8 Quantization Service (one-time conversion)
+  llava-quantizer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tensorrt-llm
+    container_name: llava-quantizer
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - TRT_LOGGER_LEVEL=INFO
+      - QUANTIZATION_MODE=FP8
+      - CALIBRATION_SAMPLES=512
+      - ACCURACY_THRESHOLD=0.95
+    volumes:
+      - /mnt/models/llava-7b:/mnt/models/llava-7b:ro
+      - /mnt/engines/llava-fp8:/mnt/engines/llava-fp8:rw
+      - ./scripts:/workspace/scripts:ro
+      - ./logs/quantization:/workspace/logs:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 32G
+    command: ["python3", "/workspace/scripts/convert_to_fp8.py"]
+    profiles: ["quantization"]
+
+  # Triton Inference Server with FP8 Model
+  triton-server-fp8:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    container_name: triton-llava-fp8
+    runtime: nvidia
+    ports:
+      - "8000:8000" # HTTP
+      - "8001:8001" # GRPC
+      - "8002:8002" # Metrics
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - TRITON_MODEL_REPO=/models
+      - TRITON_SERVER_CPU_ONLY=0
+      - TRITON_ENABLE_GPU=1
+      - TRITON_MIN_COMPUTE_CAPABILITY=8.9 # L4 GPU
+      - TRITON_BACKEND_CONFIG=tensorrt,coalesce-request-input=true
+      - TRITON_BACKEND_CONFIG=tensorrt,enable-memory-mapping=true
+      - TRITON_BACKEND_CONFIG=tensorrt,gather-kernel-buffer-threshold=0
+      - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+    volumes:
+      - /mnt/models/triton:/models:ro
+      - /mnt/engines/llava-fp8:/engines:ro
+      - ./triton/models:/models/custom:ro
+      - triton-cache:/tmp/triton-cache
+      - ./logs/triton:/logs:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 28G
+          cpus: "8"
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--model-control-mode=explicit",
+        "--load-model=ensemble_llava",
+        "--load-model=clip_encoder",
+        "--load-model=llava_fp8",
+        "--strict-model-config=false",
+        "--log-verbose=1",
+        "--log-file=/logs/triton.log",
+        "--metrics-port=8002",
+        "--allow-metrics=true",
+        "--allow-gpu-metrics=true",
+        "--gpu-metrics-interval=5000",
+        "--pinned-memory-pool-byte-size=268435456",
+        "--cuda-memory-pool-byte-size=0:8589934592",
+        "--response-cache-byte-size=1073741824",
+        "--backend-config=tensorflow,version-policy=latest",
+        "--rate-limit=execution_count",
+        "--rate-limit-resource=execution_count:16",
+      ]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+  # API Gateway with JWT Authentication
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gateway
+    container_name: llava-gateway
+    ports:
+      - "8888:8888"
+    environment:
+      - TRITON_HTTP_ENDPOINT=http://triton-server-fp8:8000
+      - TRITON_GRPC_ENDPOINT=triton-server-fp8:8001
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ENABLE_STREAMING=true
+      - MAX_BATCH_SIZE=16
+      - REQUEST_TIMEOUT=30
+      - ENABLE_AB_TESTING=${ENABLE_AB_TESTING:-false}
+      - FP16_ENDPOINT=${FP16_ENDPOINT:-http://triton-server-fp16:8000}
+      - AB_TEST_RATIO=${AB_TEST_RATIO:-0.1} # 10% to FP16
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+    volumes:
+      - ./gateway:/app:ro
+      - ./logs/gateway:/logs:rw
+      - gateway-cache:/tmp/cache
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      - redis-cache
+
+  # Redis for caching and session management
+  redis-cache:
+    image: redis:7-alpine
+    container_name: llava-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "2gb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+        "--tcp-keepalive",
+        "300",
+        "--timeout",
+        "0",
+        "--tcp-backlog",
+        "511",
+      ]
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: llava-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.retention.time=7d"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "0.5"
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: llava-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Health Monitor and Auto-rollback Service
+  health-monitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.monitor
+    container_name: llava-monitor
+    environment:
+      - TRITON_METRICS_URL=http://triton-server-fp8:8002/metrics
+      - GATEWAY_URL=http://api-gateway:8888
+      - ACCURACY_THRESHOLD=0.95
+      - LATENCY_P99_THRESHOLD=500 # ms
+      - THROUGHPUT_THRESHOLD=100 # img/sec
+      - CHECK_INTERVAL=60 # seconds
+      - ROLLBACK_ENABLED=true
+      - ROLLBACK_COMMAND=/scripts/rollback_to_fp16.sh
+      - ALERT_WEBHOOK=${ALERT_WEBHOOK_URL}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./logs/monitor:/logs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    restart: unless-stopped
+    depends_on:
+      - triton-server-fp8
+      - api-gateway
+
+  # FP16 Fallback Service (for A/B testing)
+  triton-server-fp16:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    container_name: triton-llava-fp16
+    runtime: nvidia
+    ports:
+      - "8010:8000" # HTTP
+      - "8011:8001" # GRPC
+      - "8012:8002" # Metrics
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - TRITON_MODEL_REPO=/models
+    volumes:
+      - /mnt/models/triton-fp16:/models:ro
+      - /mnt/models/llava-7b:/original-model:ro
+      - triton-cache-fp16:/tmp/triton-cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 28G
+          cpus: "8"
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--model-control-mode=explicit",
+        "--load-model=llava_fp16",
+        "--strict-model-config=false",
+      ]
+    profiles: ["ab-testing"]
+    restart: unless-stopped
+
+volumes:
+  triton-cache:
+    driver: local
+  triton-cache-fp16:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  gateway-cache:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
