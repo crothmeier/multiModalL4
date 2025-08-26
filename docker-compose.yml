@@ -1,11 +1,14 @@
 version: "3.8"
 x-vllm-base: &vllm-base
-  image: vllm/vllm-openai:v0.6.3.post1
+  image: vllm/vllm-openai:v0.6.3
   volumes:
     - /mnt/models:/models:ro
-    - vllm-cache:/root/.cache/huggingface
+    - ./logs:/logs
   environment:
     - HF_TOKEN=${HF_TOKEN:?Error: HF_TOKEN environment variable is required}
+    - VLLM_API_KEY=${VLLM_API_KEY:-default-key}
+    - CUDA_VISIBLE_DEVICES=0
+    - VLLM_WORKER_MULTIPROC_METHOD=spawn
   deploy:
     resources:
       reservations:
@@ -13,85 +16,102 @@ x-vllm-base: &vllm-base
           - driver: nvidia
             count: 1
             capabilities: [gpu]
-  restart: "no" # Important: orchestrator manages lifecycle
-  network_mode: bridge
+  restart: unless-stopped
+  ipc: host
+  shm_size: 16gb
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 60s
 services:
-  model-orchestrator:
-    build: ./services/model-orchestrator
-    container_name: multimodal-stack-orchestrator
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    ports:
-      - "8888:8888"
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-  mistral-llm:
-    !!merge <<: *vllm-base
-    container_name: multimodal-stack-mistral-llm-1
-    command:
-      - --model=/models/mistral-awq
-      - --served-model-name=mistral
-      - --max-model-len=8192
-      - --gpu-memory-utilization=0.85
-      - --host=0.0.0.0
-      - --port=8000
+  mistral:
+    <<: *vllm-base
+    container_name: vllm-mistral
     ports:
       - "8001:8000"
-  llava-llm:
-    !!merge <<: *vllm-base
-    container_name: multimodal-stack-llava-llm-1
-    command:
-      - --model=/models/llava-7b
-      - --tokenizer=liuhaotian/llava-v1.5-7b
-      - --served-model-name=llava
-      - --trust-remote-code
-      - --download-dir=/models
-      - --tokenizer-mode=auto
-      - --max-model-len=4096
-      - --gpu-memory-utilization=0.10
-      - --disable-custom-all-reduce
-      - --image-input-type=pixel_values
-      - --host=0.0.0.0
-      - --port=8000
+    command: >
+      --model /models/mistral-7b-awq/
+      --quantization awq
+      --dtype auto
+      --api-key ${VLLM_API_KEY:-default-key}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len 4096
+      --gpu-memory-utilization 0.30
+      --max-num-seqs 8
+      --enable-prefix-caching
+      --disable-log-requests
+      --trust-remote-code
+    profiles:
+      - mistral
+
+  deepseek-coder:
+    <<: *vllm-base
+    container_name: vllm-deepseek-coder
     ports:
       - "8002:8000"
-  coder-llm:
-    !!merge <<: *vllm-base
-    container_name: multimodal-stack-coder-llm-1
-    command:
-      - --model=/models/deepseek-gptq
-      - --served-model-name=coder
-      - --quantization=gptq
-      - --dtype=float16
-      - --max-model-len=4096
-      - --gpu-memory-utilization=0.85
-      - --host=0.0.0.0
-      - --port=8000
+    command: >
+      --model /models/deepseek-coder-gptq/
+      --quantization gptq
+      --dtype auto
+      --api-key ${VLLM_API_KEY:-default-key}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len 8192
+      --gpu-memory-utilization 0.45
+      --max-num-seqs 4
+      --enable-prefix-caching
+      --disable-log-requests
+      --trust-remote-code
+    profiles:
+      - coder
+
+  llava:
+    <<: *vllm-base
+    container_name: vllm-llava
     ports:
-      - "8000:8000"
-  api-gateway:
-    build: ./services/api-gateway
-    container_name: multimodal-stack-gateway
-    ports:
-      - "8080:8080"
-    environment:
-      - ORCHESTRATOR_URL=http://model-orchestrator:8888
-      - LLM_URL=http://host.docker.internal:8000
-    restart: unless-stopped
-    depends_on:
-      - model-orchestrator
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-volumes:
-  vllm-cache:
+      - "8003:8000"
+    command: >
+      --model /models/llava/
+      --dtype auto
+      --api-key ${VLLM_API_KEY:-default-key}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len 4096
+      --gpu-memory-utilization 0.80
+      --max-num-seqs 2
+      --enable-prefix-caching
+      --disable-log-requests
+      --trust-remote-code
+      --chat-template template_llava.jinja
+      --image-input-type pixel_values
+      --image-token-id 32000
+      --image-input-shape 1,3,336,336
+      --image-feature-size 576
+    profiles:
+      - llava
+
+  model-manager:
+    image: alpine:latest
+    container_name: model-manager
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./scripts:/scripts:ro
+    command: >
+      sh -c "
+      apk add --no-cache docker-cli curl jq &&
+      echo 'Model Manager ready. Use docker compose profiles to switch models:' &&
+      echo '  docker compose --profile mistral up -d' &&
+      echo '  docker compose --profile coder up -d' &&
+      echo '  docker compose --profile llava up -d' &&
+      echo 'Stop all: docker compose down' &&
+      tail -f /dev/null
+      "
+    profiles:
+      - manager
 networks:
   default:
-    name: multimodal-stack
+    name: multimodal-llm-network
+    driver: bridge
