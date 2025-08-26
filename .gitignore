@@ -1,11 +1,37 @@
-.env
-
-# --- infra & dev artefacts ---
-*.log
-*.pyc
+# === Python ===
 __pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+.venv*/
+.env*/
+.Python
+
+# === Logs & runtime ===
+logs/
+*.log
+*.out
+*.err
+
+# === Docker & Compose ===
+# named volumes shouldn't be tracked
+volumes/
+docker-data/
 .vscode/
 .idea/
-docker-compose.*.bak
-docker-compose.*.pre*
-docker-compose.yml.backup-*
+
+# === Jupyter & Notebooks ===
+.ipynb_checkpoints/
+
+# === System cruft ===
+.DS_Store
+Thumbs.db
+
+# === Local scripts (exclude if not needed in repo) ===
+scripts/validate_structure.sh
+
+# === Model artifacts ===
+/mnt/models/
+/models/
+/checkpoints/
