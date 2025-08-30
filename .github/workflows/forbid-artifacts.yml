@@ -1,0 +1,22 @@
+name: Forbid Artifacts
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  forbid-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set base SHA
+        run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+
+      - name: Check for forbidden artifacts
+        run: |
+          chmod +x scripts/ci/forbid_artifacts.sh
+          ./scripts/ci/forbid_artifacts.sh "$BASE_SHA"

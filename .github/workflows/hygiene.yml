@@ -1,0 +1,29 @@
+name: Hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pre-commit and detect-secrets
+        run: |
+          pip install --upgrade pre-commit detect-secrets
+
+      - name: Run pre-commit hooks
+        run: |
+          pre-commit run --all-files
