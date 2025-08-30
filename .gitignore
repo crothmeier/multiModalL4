@@ -1,11 +1,67 @@
-.env
+# === Compose backups ===
+docker-compose.yml.backup-*
+migrations/**/docker-compose.yml.backup-*
 
-# --- infra & dev artefacts ---
-*.log
-*.pyc
+# === Local environment & tokens ===
+.env
+.env.*
+.envrc
+*.pem
+*.key
+*.pfx
+*.jks
+token*
+hf_*
+
+# === Model artifacts ===
+models/
+*.gguf
+*.safetensors
+*.pt
+*.bin
+*.onnx
+*.ckpt
+*.npz
+*.npy
+*.tar
+*.zst
+*.gz
+*.zip
+*.parquet
+
+# === Python ===
 __pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv*/
+.Python
+
+# === Caches & logs ===
+.cache/
+logs/
+*.log
+*.out
+*.err
+
+# === IDE ===
 .vscode/
 .idea/
-docker-compose.*.bak
-docker-compose.*.pre*
-docker-compose.yml.backup-*
+*.swp
+*.swo
+*~
+
+# === Jupyter ===
+.ipynb_checkpoints/
+
+# === System ===
+.DS_Store
+Thumbs.db
+
+# === Docker volumes ===
+volumes/
+docker-data/

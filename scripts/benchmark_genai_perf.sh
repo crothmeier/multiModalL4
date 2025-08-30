@@ -87,10 +87,10 @@ run_benchmark() {
         -v ${RESULTS_DIR}:/results \
         nvcr.io/nvidia/genai-perf:24.06.0 \
         genai-perf \
-            --endpoint ${TRITON_ENDPOINT}/v2/models/${MODEL_NAME}/generate \
+            --endpoint "${TRITON_ENDPOINT}"/v2/models/""/generate \
             --service-kind triton \
-            --model ${MODEL_NAME} \
-            --backend ${BACKEND} \
+            --model "${MODEL_NAME}" \
+            --backend "${BACKEND}" \
             --profile-export-file /results/fp8_profile_c${concurrency}.json \
             --concurrency ${concurrency} \
             --synthetic-input-tokens-mean ${INPUT_TOKENS_MEAN} \
@@ -142,10 +142,10 @@ run_warmup() {
     docker run --rm --gpus all --net host \
         nvcr.io/nvidia/genai-perf:24.06.0 \
         genai-perf \
-            --endpoint ${TRITON_ENDPOINT}/v2/models/${MODEL_NAME}/generate \
+            --endpoint "${TRITON_ENDPOINT}"/v2/models/""/generate \
             --service-kind triton \
-            --model ${MODEL_NAME} \
-            --backend ${BACKEND} \
+            --model "${MODEL_NAME}" \
+            --backend "${BACKEND}" \
             --concurrency 1 \
             --synthetic-input-tokens-mean 128 \
             --output-tokens-mean 32 \
