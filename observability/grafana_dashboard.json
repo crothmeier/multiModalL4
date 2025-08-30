@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "Multimodal LLM Stack",
-    "panels": []
+    "panels": [],
+    "title": "Multimodal LLM Stack"
   }
 }

@@ -366,7 +366,7 @@ def main():
                         duration = time.time() - manager.low_efficiency_start
                         if duration > 300 and manager.speculation_enabled:  # 5 minutes
                             logger.error(
-                                f"Speculation efficiency below 0.55 for {duration/60:.1f} minutes, disabling speculation"
+                                f"Speculation efficiency below 0.55 for {duration / 60:.1f} minutes, disabling speculation"
                             )
 
                             # Disable speculation

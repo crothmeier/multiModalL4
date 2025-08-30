@@ -5,21 +5,18 @@ Tracks performance metrics and manages A/B testing
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
-import sys
-import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional
 
 import aiohttp
 import numpy as np
 import redis
-from prometheus_client import Counter, Gauge, Histogram, Summary, start_http_server
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -315,7 +312,7 @@ class PerformanceMonitor:
         logger.info(f"A/B Test Results after {total_tests} tests:")
         logger.info(f"  FP8 wins: {fp8_win_rate:.1%}")
         logger.info(f"  FP16 wins: {fp16_win_rate:.1%}")
-        logger.info(f"  Ties: {(self.ab_test_results.inconclusive/total_tests):.1%}")
+        logger.info(f"  Ties: {(self.ab_test_results.inconclusive / total_tests):.1%}")
 
         # Switch if FP16 consistently wins
         if fp16_win_rate > 0.6:  # FP16 wins >60% of the time
@@ -382,9 +379,7 @@ class PerformanceMonitor:
                     # Update Prometheus metrics
                     self.latency_histogram.labels(
                         model_version="fp8", endpoint="inference"
-                    ).observe(
-                        fp8_metrics.latency_p99 / 1000
-                    )  # Convert to seconds
+                    ).observe(fp8_metrics.latency_p99 / 1000)  # Convert to seconds
 
                     self.throughput_gauge.labels(model_version="fp8").set(
                         fp8_metrics.throughput

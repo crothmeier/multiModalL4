@@ -6,22 +6,22 @@ echo
 
 # Function to test model
 test_model() {
-    local model=$1
-    local prompt=$2
-    echo "Testing $model..."
-    echo "Prompt: $prompt"
+  local model=$1
+  local prompt=$2
+  echo "Testing $model..."
+  echo "Prompt: $prompt"
 
-    # Direct test without orchestrator for now
-    response=$(curl -s -X POST http://localhost:8000/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -d "{
+  # Direct test without orchestrator for now
+  response=$(curl -s -X POST http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d "{
         \"model\": \"$model\",
         \"messages\": [{\"role\": \"user\", \"content\": \"$prompt\"}],
         \"max_tokens\": 50
       }" | jq -r '.choices[0].message.content // .error.message // "Error"')
 
-    echo "Response: $response"
-    echo
+  echo "Response: $response"
+  echo
 }
 
 # Check current status
@@ -41,11 +41,11 @@ echo
 # Manual swap demonstration
 echo "=== Demonstrating Manual Model Swap ==="
 echo "Stopping Mistral..."
-docker stop multimodal-stack-mistral-llm-1 >/dev/null 2>&1
+docker stop multimodal-stack-mistral-llm-1 > /dev/null 2>&1
 sleep 3
 
 echo "Starting Coder model..."
-docker start multimodal-stack-coder-llm-1 2>/dev/null || docker compose up -d coder-llm
+docker start multimodal-stack-coder-llm-1 2> /dev/null || docker compose up -d coder-llm
 echo "Waiting for model to load..."
 sleep 20
 

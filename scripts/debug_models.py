@@ -38,9 +38,9 @@ MODELS = {
 
 def test_model_loading(model_name, config):
     """Test if a model can be loaded with vLLM."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing {model_name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Build vLLM command
     cmd = [

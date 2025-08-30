@@ -65,3 +65,25 @@ Thumbs.db
 # === Docker volumes ===
 volumes/
 docker-data/
+
+# === Guardrails: forbid big artifacts and backups ===
+docker-compose.yml.backup-*
+docker-compose.yml.bak
+*.tar
+*.tar.gz
+*.zst
+*.gz
+*.zip
+*.npz
+*.npy
+*.parquet
+*.onnx
+*.pt
+*.ckpt
+*.bin
+*.engine
+*.plan
+
+# Model trees (keep configs via allowlists in repo)
+models/
+triton/models/*/1/

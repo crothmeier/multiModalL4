@@ -6,27 +6,22 @@ Monitors model performance, accuracy, and system resources
 
 import asyncio
 import base64
-import io
 import json
 import logging
 import os
-import sys
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import aiohttp
 import GPUtil
-import numpy as np
 import psutil
 import requests
-from PIL import Image
 from prometheus_client import (
     CollectorRegistry,
     Counter,
     Gauge,
-    Histogram,
     push_to_gateway,
 )
 
@@ -426,7 +421,7 @@ class HealthChecker:
         if webhook_url:
             try:
                 payload = {
-                    "text": f"LLaVA FP8 Health Check Failed",
+                    "text": "LLaVA FP8 Health Check Failed",
                     "issues": issues,
                     "timestamp": datetime.now().isoformat(),
                     "severity": "critical",

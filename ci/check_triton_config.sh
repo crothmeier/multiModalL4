@@ -13,11 +13,11 @@ docker run --rm \
   -v "$(pwd)/${MODEL_REPO}:/models" \
   "${IMAGE}" \
   tritonserver \
-    --model-repository=/models \
-    --dry-run \
-    --log-verbose=0 \
-    --exit-on-error=true \
-| tee triton_lint.log
+  --model-repository=/models \
+  --dry-run \
+  --log-verbose=0 \
+  --exit-on-error=true \
+  | tee triton_lint.log
 
 echo "Scanning log for proto/config errors..."
 if grep -Ei '(Unknown field|invalid argument|failed to|ERROR:)' triton_lint.log; then
