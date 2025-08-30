@@ -34,7 +34,7 @@ class TestGPUMemory:
             used, total = map(int, line.split(", "))
             utilization = used / total
 
-            assert (
-                utilization < 0.90
-            ), f"GPU memory usage {utilization:.1%} exceeds 90% threshold"
+            assert utilization < 0.90, (
+                f"GPU memory usage {utilization:.1%} exceeds 90% threshold"
+            )
             print(f"✓ GPU memory usage: {utilization:.1%} ({used}/{total} MB)")

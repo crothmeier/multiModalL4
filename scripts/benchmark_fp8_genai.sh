@@ -23,24 +23,24 @@ docker run --rm \
   -v "$RESULTS_DIR:/results" \
   nvcr.io/nvidia/tritonserver:24.06-py3-sdk \
   genai-perf \
-    --model "$MODEL_NAME" \
-    --backend tensorrtllm \
-    --endpoint "v2/models/$MODEL_NAME/generate" \
-    --endpoint-type triton \
-    --service-kind triton \
-    --url "$TRITON_URL" \
-    --num-prompts "$NUM_PROMPTS" \
-    --random-seed 42 \
-    --synthetic-input-tokens-mean 1024 \
-    --synthetic-input-tokens-stddev 256 \
-    --output-tokens-mean 128 \
-    --output-tokens-stddev 32 \
-    --concurrency 1 2 4 8 16 \
-    --percentile 50 90 95 99 \
-    --measurement-interval 10000 \
-    --profile-export-file "/results/fp8_profile.json" \
-    --generate-plots \
-    --verbose
+  --model "$MODEL_NAME" \
+  --backend tensorrtllm \
+  --endpoint "v2/models/$MODEL_NAME/generate" \
+  --endpoint-type triton \
+  --service-kind triton \
+  --url "$TRITON_URL" \
+  --num-prompts "$NUM_PROMPTS" \
+  --random-seed 42 \
+  --synthetic-input-tokens-mean 1024 \
+  --synthetic-input-tokens-stddev 256 \
+  --output-tokens-mean 128 \
+  --output-tokens-stddev 32 \
+  --concurrency 1 2 4 8 16 \
+  --percentile 50 90 95 99 \
+  --measurement-interval 10000 \
+  --profile-export-file "/results/fp8_profile.json" \
+  --generate-plots \
+  --verbose
 
 # Run memory bandwidth specific test for L4
 echo "Running L4-specific memory bandwidth test..."
@@ -50,49 +50,49 @@ docker run --rm \
   -v "$RESULTS_DIR:/results" \
   nvcr.io/nvidia/tritonserver:24.06-py3-sdk \
   genai-perf \
-    --model "$MODEL_NAME" \
-    --backend tensorrtllm \
-    --endpoint "v2/models/$MODEL_NAME/generate" \
-    --endpoint-type triton \
-    --service-kind triton \
-    --url "$TRITON_URL" \
-    --num-prompts 100 \
-    --batch-size 1 2 4 8 \
-    --synthetic-input-tokens-mean 2048 \
-    --output-tokens-mean 256 \
-    --concurrency 1 \
-    --profile-export-file "/results/fp8_bandwidth_test.json" \
-    --verbose
+  --model "$MODEL_NAME" \
+  --backend tensorrtllm \
+  --endpoint "v2/models/$MODEL_NAME/generate" \
+  --endpoint-type triton \
+  --service-kind triton \
+  --url "$TRITON_URL" \
+  --num-prompts 100 \
+  --batch-size 1 2 4 8 \
+  --synthetic-input-tokens-mean 2048 \
+  --output-tokens-mean 256 \
+  --concurrency 1 \
+  --profile-export-file "/results/fp8_bandwidth_test.json" \
+  --verbose
 
 # Compare with FP16 if available
 if curl -s "http://$TRITON_URL/v2/models/llava_fp16/ready" | grep -q "true"; then
-    echo "Running comparison benchmark against FP16 model..."
+  echo "Running comparison benchmark against FP16 model..."
 
-    docker run --rm \
-      --gpus all \
-      --network host \
-      -v "$RESULTS_DIR:/results" \
-      nvcr.io/nvidia/tritonserver:24.06-py3-sdk \
-      genai-perf \
-        --model llava_fp16 \
-        --backend tensorrtllm \
-        --endpoint v2/models/llava_fp16/generate \
-        --endpoint-type triton \
-        --service-kind triton \
-        --url "$TRITON_URL" \
-        --num-prompts 500 \
-        --random-seed 42 \
-        --synthetic-input-tokens-mean 1024 \
-        --output-tokens-mean 128 \
-        --concurrency 4 \
-        --percentile 50 90 95 99 \
-        --profile-export-file "/results/fp16_profile.json" \
-        --verbose
+  docker run --rm \
+    --gpus all \
+    --network host \
+    -v "$RESULTS_DIR:/results" \
+    nvcr.io/nvidia/tritonserver:24.06-py3-sdk \
+    genai-perf \
+    --model llava_fp16 \
+    --backend tensorrtllm \
+    --endpoint v2/models/llava_fp16/generate \
+    --endpoint-type triton \
+    --service-kind triton \
+    --url "$TRITON_URL" \
+    --num-prompts 500 \
+    --random-seed 42 \
+    --synthetic-input-tokens-mean 1024 \
+    --output-tokens-mean 128 \
+    --concurrency 4 \
+    --percentile 50 90 95 99 \
+    --profile-export-file "/results/fp16_profile.json" \
+    --verbose
 fi
 
 # Parse and summarize results
 echo "Parsing benchmark results..."
-python3 - <<'EOF' "$RESULTS_DIR"
+python3 - "$RESULTS_DIR" << 'EOF'
 import json
 import sys
 import os
@@ -149,7 +149,7 @@ EOF
 echo "Benchmark complete! Results saved in: $RESULTS_DIR"
 
 # Generate performance report
-cat > "$RESULTS_DIR/performance_report.md" <<EOF
+cat > "$RESULTS_DIR/performance_report.md" << EOF
 # LLaVA FP8 Performance Report
 
 ## Test Configuration

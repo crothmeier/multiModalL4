@@ -9,9 +9,8 @@ import logging
 import os
 import subprocess
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 
-import requests
 import yaml
 
 logging.basicConfig(
@@ -161,9 +160,9 @@ class L4BandwidthOptimizer:
             l4_params = f"""
 # L4 Bandwidth Optimizations
 parameters: [
-  {{ key: "max_num_seqs", value: {{ string_value: "{optimizations['continuous_batching']['max_num_seqs']}" }} }},
-  {{ key: "block_size", value: {{ string_value: "{optimizations['block_size']}" }} }},
-  {{ key: "num_gpu_blocks_override", value: {{ string_value: "{optimizations['num_gpu_blocks_override']}" }} }},
+  {{ key: "max_num_seqs", value: {{ string_value: "{optimizations["continuous_batching"]["max_num_seqs"]}" }} }},
+  {{ key: "block_size", value: {{ string_value: "{optimizations["block_size"]}" }} }},
+  {{ key: "num_gpu_blocks_override", value: {{ string_value: "{optimizations["num_gpu_blocks_override"]}" }} }},
   {{ key: "gpu_memory_utilization", value: {{ string_value: "{self.config.gpu_memory_utilization}" }} }},
   {{ key: "enable_chunked_prefill", value: {{ string_value: "{str(self.config.enable_chunked_prefill).lower()}" }} }},
   {{ key: "max_num_batched_tokens", value: {{ string_value: "{self.config.max_num_batched_tokens}" }} }}
@@ -352,18 +351,18 @@ parameters: [
 - Block Size: {self.config.block_size}
 - Max Batched Tokens: {self.config.max_num_batched_tokens}
 - KV Cache Type: {self.config.kv_cache_dtype}
-- CUDA Graphs: {'Enabled' if self.config.enable_cuda_graph else 'Disabled'}
+- CUDA Graphs: {"Enabled" if self.config.enable_cuda_graph else "Disabled"}
 
 ## Bandwidth Utilization
-- Memory Utilization: {bandwidth_stats.get('avg_memory_utilization', 'N/A')}%
-- Bandwidth Utilization: {bandwidth_stats.get('avg_bandwidth_utilization', 'N/A')}%
-- Status: {bandwidth_stats.get('recommendation', 'Unknown')}
+- Memory Utilization: {bandwidth_stats.get("avg_memory_utilization", "N/A")}%
+- Bandwidth Utilization: {bandwidth_stats.get("avg_bandwidth_utilization", "N/A")}%
+- Status: {bandwidth_stats.get("recommendation", "Unknown")}
 
 ## Optimization Strategy
 1. Reduced max_num_seqs from 256 to {self.config.max_num_seqs}
 2. Increased block_size to {self.config.block_size} for fewer memory transfers
 3. Using {self.config.kv_cache_dtype} for KV-cache (conservative approach)
-4. {'Enabled' if self.config.enable_cuda_graph else 'Disabled'} CUDA graphs for kernel fusion
+4. {"Enabled" if self.config.enable_cuda_graph else "Disabled"} CUDA graphs for kernel fusion
 
 ## Recommendations
 1. Monitor bandwidth saturation closely

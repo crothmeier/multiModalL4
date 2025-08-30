@@ -17,7 +17,7 @@ echo "→ Unstaging backup files from git index..."
 git_unstage_count=0
 while IFS= read -r -d '' file; do
   if git ls-files --cached --others --exclude-standard | grep -q "^${file}$"; then
-    git reset HEAD "${file}" 2>/dev/null || true
+    git reset HEAD "${file}" 2> /dev/null || true
     ((git_unstage_count++))
   fi
 done < <(find . -name "${BACKUP_PATTERN}" -print0)
@@ -66,7 +66,7 @@ if [[ -n "${latest_backup}" ]]; then
 
     # Generate SHA256SUMS for curated files
     echo "→ Generating SHA256SUMS for curated files..."
-    (cd "${CURATED_DIR}" && sha256sum ./*.backup-* > SHA256SUMS 2>/dev/null || true)
+    (cd "${CURATED_DIR}" && sha256sum ./*.backup-* > SHA256SUMS 2> /dev/null || true)
   else
     echo "  Latest backup already curated"
   fi
@@ -79,7 +79,7 @@ echo "→ Verifying .gitignore patterns..."
 test_file="docker-compose.yml.backup-test"
 touch "${test_file}"
 
-if git check-ignore "${test_file}" >/dev/null 2>&1; then
+if git check-ignore "${test_file}" > /dev/null 2>&1; then
   echo "  ✓ Root backup pattern correctly ignored"
 else
   echo "  ✗ WARNING: Root backup pattern not ignored!"
@@ -93,16 +93,16 @@ test_migration_file="migrations/test/docker-compose.yml.backup-test"
 mkdir -p "$(dirname "${test_migration_file}")"
 touch "${test_migration_file}"
 
-if git check-ignore "${test_migration_file}" >/dev/null 2>&1; then
+if git check-ignore "${test_migration_file}" > /dev/null 2>&1; then
   echo "  ✓ Migration backup pattern correctly ignored"
 else
   echo "  ✗ WARNING: Migration backup pattern not ignored!"
   rm -f "${test_migration_file}"
-  rmdir "$(dirname "${test_migration_file}")" 2>/dev/null || true
+  rmdir "$(dirname "${test_migration_file}")" 2> /dev/null || true
   exit 1
 fi
 rm -f "${test_migration_file}"
-rmdir "$(dirname "${test_migration_file}")" 2>/dev/null || true
+rmdir "$(dirname "${test_migration_file}")" 2> /dev/null || true
 
 # Step 5: Final check - ensure no backups would be added
 echo "→ Final verification..."

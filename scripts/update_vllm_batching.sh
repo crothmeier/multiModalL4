@@ -16,35 +16,35 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+  echo -e "${GREEN}[INFO]${NC} $1"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+  echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+  echo -e "${RED}[ERROR]${NC} $1"
 }
 
 log_section() {
-    echo -e "\n${BLUE}═══════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  $1${NC}"
-    echo -e "${BLUE}═══════════════════════════════════════════${NC}\n"
+  echo -e "\n${BLUE}═══════════════════════════════════════════${NC}"
+  echo -e "${BLUE}  $1${NC}"
+  echo -e "${BLUE}═══════════════════════════════════════════${NC}\n"
 }
 
 # Update docker-compose.yml to use correct vLLM CLI flags
 update_vllm_services() {
-    log_section "Updating vLLM Services Configuration"
+  log_section "Updating vLLM Services Configuration"
 
-    # Backup original file
-    cp "${PROJECT_ROOT}/docker-compose.yml" "${PROJECT_ROOT}/docker-compose.yml.bak.$(date +%Y%m%d_%H%M%S)"
+  # Backup original file
+  cp "${PROJECT_ROOT}/docker-compose.yml" "${PROJECT_ROOT}/docker-compose.yml.bak.$(date +%Y%m%d_%H%M%S)"
 
-    # Update the vLLM service configurations
-    log_info "Updating vLLM command flags for continuous batching..."
+  # Update the vLLM service configurations
+  log_info "Updating vLLM command flags for continuous batching..."
 
-    # Create temporary file with updated configuration
-    cat > "${PROJECT_ROOT}/docker-compose.vllm-update.yml" <<'EOF'
+  # Create temporary file with updated configuration
+  cat > "${PROJECT_ROOT}/docker-compose.vllm-update.yml" << 'EOF'
 # vLLM Service Configuration Update Patch
 # Add these flags to vLLM services:
 
@@ -82,14 +82,14 @@ update_vllm_services() {
       - --enable-prefix-caching
 EOF
 
-    log_info "vLLM configuration update template created"
+  log_info "vLLM configuration update template created"
 
-    # Apply updates to docker-compose.yml using yq if available
-    if command -v yq &> /dev/null; then
-        log_info "Using yq to update docker-compose.yml..."
+  # Apply updates to docker-compose.yml using yq if available
+  if command -v yq &> /dev/null; then
+    log_info "Using yq to update docker-compose.yml..."
 
-        # Update llava-llm service
-        yq eval '.services.llava-llm.command += [
+    # Update llava-llm service
+    yq eval '.services.llava-llm.command += [
             "--continuous-batching",
             "--max-num-seqs=8",
             "--max-num-paddings=32",
@@ -100,35 +100,35 @@ EOF
             "--kv-cache-dtype=fp8_e5m2"
         ]' -i "${PROJECT_ROOT}/docker-compose.yml"
 
-        # Update mistral-llm service
-        yq eval '.services.mistral-llm.command += [
+    # Update mistral-llm service
+    yq eval '.services.mistral-llm.command += [
             "--continuous-batching",
             "--max-num-seqs=8",
             "--max-num-paddings=32",
             "--enable-prefix-caching"
         ]' -i "${PROJECT_ROOT}/docker-compose.yml"
 
-        # Update coder-llm service
-        yq eval '.services.coder-llm.command += [
+    # Update coder-llm service
+    yq eval '.services.coder-llm.command += [
             "--continuous-batching",
             "--max-num-seqs=8",
             "--max-num-paddings=32",
             "--enable-prefix-caching"
         ]' -i "${PROJECT_ROOT}/docker-compose.yml"
 
-        log_info "docker-compose.yml updated successfully with yq"
-    else
-        log_warn "yq not found, manual update required"
-        log_info "Please manually add the following flags to vLLM services:"
-        cat "${PROJECT_ROOT}/docker-compose.vllm-update.yml"
-    fi
+    log_info "docker-compose.yml updated successfully with yq"
+  else
+    log_warn "yq not found, manual update required"
+    log_info "Please manually add the following flags to vLLM services:"
+    cat "${PROJECT_ROOT}/docker-compose.vllm-update.yml"
+  fi
 }
 
 # Create vLLM startup script with proper parameters
 create_vllm_startup_script() {
-    log_section "Creating vLLM Startup Script"
+  log_section "Creating vLLM Startup Script"
 
-    cat > "${PROJECT_ROOT}/scripts/start_vllm_optimized.sh" <<'EOF'
+  cat > "${PROJECT_ROOT}/scripts/start_vllm_optimized.sh" << 'EOF'
 #!/bin/bash
 # Optimized vLLM startup script for L4 GPU with continuous batching
 
@@ -161,35 +161,35 @@ exec python -m vllm.entrypoints.openai.api_server \
     --tokenizer-mode=auto
 EOF
 
-    chmod +x "${PROJECT_ROOT}/scripts/start_vllm_optimized.sh"
-    log_info "Created optimized vLLM startup script"
+  chmod +x "${PROJECT_ROOT}/scripts/start_vllm_optimized.sh"
+  log_info "Created optimized vLLM startup script"
 }
 
 # Validate configuration
 validate_config() {
-    log_section "Validating Configuration"
+  log_section "Validating Configuration"
 
-    # Check if docker-compose.yml has continuous batching flags
-    if grep -q "continuous-batching" "${PROJECT_ROOT}/docker-compose.yml"; then
-        log_info "✅ Continuous batching flags found in docker-compose.yml"
-    else
-        log_warn "⚠️  Continuous batching flags not found in docker-compose.yml"
-        log_info "Please manually add the flags or install yq"
-    fi
+  # Check if docker-compose.yml has continuous batching flags
+  if grep -q "continuous-batching" "${PROJECT_ROOT}/docker-compose.yml"; then
+    log_info "✅ Continuous batching flags found in docker-compose.yml"
+  else
+    log_warn "⚠️  Continuous batching flags not found in docker-compose.yml"
+    log_info "Please manually add the flags or install yq"
+  fi
 
-    # Check vLLM version in image
-    log_info "Checking vLLM image version..."
-    if grep -q "vllm/vllm-openai:v0.6" "${PROJECT_ROOT}/docker-compose.yml"; then
-        log_warn "Using vLLM 0.6.x - consider upgrading to 0.8.4+ for better FP8 support"
-        log_info "Update image to: vllm/vllm-openai:v0.8.4 or newer"
-    fi
+  # Check vLLM version in image
+  log_info "Checking vLLM image version..."
+  if grep -q "vllm/vllm-openai:v0.6" "${PROJECT_ROOT}/docker-compose.yml"; then
+    log_warn "Using vLLM 0.6.x - consider upgrading to 0.8.4+ for better FP8 support"
+    log_info "Update image to: vllm/vllm-openai:v0.8.4 or newer"
+  fi
 }
 
 # Generate report
 generate_report() {
-    log_section "Configuration Report"
+  log_section "Configuration Report"
 
-    cat > "${PROJECT_ROOT}/vllm_batching_update.md" <<EOF
+  cat > "${PROJECT_ROOT}/vllm_batching_update.md" << EOF
 # vLLM Continuous Batching Configuration Update
 
 ## Changes Applied
@@ -227,47 +227,47 @@ Watch these metrics:
 To rollback: \`cp docker-compose.yml.bak.<timestamp> docker-compose.yml\`
 EOF
 
-    log_info "Report saved to: ${PROJECT_ROOT}/vllm_batching_update.md"
+  log_info "Report saved to: ${PROJECT_ROOT}/vllm_batching_update.md"
 }
 
 # Main execution
 main() {
-    echo -e "${BLUE}╔════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║    vLLM Continuous Batching Update Script  ║${NC}"
-    echo -e "${BLUE}║           Optimized for L4 GPU             ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════════╝${NC}\n"
+  echo -e "${BLUE}╔════════════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║    vLLM Continuous Batching Update Script  ║${NC}"
+  echo -e "${BLUE}║           Optimized for L4 GPU             ║${NC}"
+  echo -e "${BLUE}╚════════════════════════════════════════════╝${NC}\n"
 
-    update_vllm_services
-    create_vllm_startup_script
-    validate_config
-    generate_report
+  update_vllm_services
+  create_vllm_startup_script
+  validate_config
+  generate_report
 
-    echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  ✅ vLLM batching update completed!${NC}"
-    echo -e "${GREEN}═══════════════════════════════════════════${NC}\n"
+  echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"
+  echo -e "${GREEN}  ✅ vLLM batching update completed!${NC}"
+  echo -e "${GREEN}═══════════════════════════════════════════${NC}\n"
 
-    log_info "Backup saved to: docker-compose.yml.bak.*"
-    log_info "Review changes and restart services when ready"
+  log_info "Backup saved to: docker-compose.yml.bak.*"
+  log_info "Review changes and restart services when ready"
 }
 
 # Parse arguments
 case "${1:-}" in
-    --help)
-        echo "Usage: $0 [OPTIONS]"
-        echo ""
-        echo "Updates vLLM services to use optimized continuous batching parameters"
-        echo ""
-        echo "Options:"
-        echo "  --help    Show this help message"
-        echo "  --apply   Apply changes and restart services"
-        exit 0
-        ;;
-    --apply)
-        main
-        log_info "Restarting vLLM services..."
-        docker-compose restart llava-llm mistral-llm coder-llm || true
-        ;;
-    *)
-        main
-        ;;
+  --help)
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Updates vLLM services to use optimized continuous batching parameters"
+    echo ""
+    echo "Options:"
+    echo "  --help    Show this help message"
+    echo "  --apply   Apply changes and restart services"
+    exit 0
+    ;;
+  --apply)
+    main
+    log_info "Restarting vLLM services..."
+    docker-compose restart llava-llm mistral-llm coder-llm || true
+    ;;
+  *)
+    main
+    ;;
 esac

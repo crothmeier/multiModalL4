@@ -2,8 +2,8 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime, timedelta
-from typing import Dict, Optional
+from datetime import datetime
+from typing import Optional
 
 import httpx
 import requests_unixsocket
@@ -25,7 +25,7 @@ if not os.environ.get("DOCKER_HOST"):
 # Initialize Docker client
 try:
     docker_client = docker.from_env()
-    logger.info(f"Successfully connected to Docker daemon")
+    logger.info("Successfully connected to Docker daemon")
 except Exception as e:
     logger.error(f"Failed to connect to Docker daemon: {e}")
     raise

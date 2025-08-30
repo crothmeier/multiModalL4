@@ -1,0 +1,17 @@
+---
+name: forbid-artifacts
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  forbid:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for forbidden artifacts
+        run: bash scripts/ci/forbid_artifacts.sh "${{ github.event.pull_request.base.sha }}"

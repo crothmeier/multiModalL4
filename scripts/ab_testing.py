@@ -337,8 +337,7 @@ class ABTestManager:
             return {
                 "status": "insufficient_data",
                 "message": (
-                    f"Need {self.config.min_sample_size - total_requests} "
-                    f"more samples"
+                    f"Need {self.config.min_sample_size - total_requests} more samples"
                 ),
                 "current_samples": total_requests,
             }
@@ -506,8 +505,8 @@ async def main():
 
     logger.info(f"Starting A/B test: {config.test_name}")
     logger.info(
-        f"Traffic split: {config.traffic_split*100:.0f}% to "
-        f"{config.variant_a}, {(1-config.traffic_split)*100:.0f}% to "
+        f"Traffic split: {config.traffic_split * 100:.0f}% to "
+        f"{config.variant_a}, {(1 - config.traffic_split) * 100:.0f}% to "
         f"{config.variant_b}"
     )
 

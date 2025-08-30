@@ -5,8 +5,6 @@ Provides seamless integration with existing infrastructure
 """
 
 import asyncio
-import hashlib
-import json
 import logging
 import os
 import sys
@@ -290,7 +288,7 @@ class ServiceLifecycleManager:
             except Exception:
                 pass
 
-            logger.info(f"Waiting for Triton... ({i+1}/{max_retries})")
+            logger.info(f"Waiting for Triton... ({i + 1}/{max_retries})")
             await asyncio.sleep(2)
 
         raise RuntimeError("Triton server failed to start")
