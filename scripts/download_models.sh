@@ -31,25 +31,25 @@ download_model() {
     local model_name=$1
     local repo_id=$2
     local target_dir="$MODEL_DIR/$model_name"
-    
+
     echo -e "${BLUE}Downloading $model_name from $repo_id...${NC}"
-    
+
     if [ ! -d "$target_dir" ]; then
         mkdir -p "$target_dir"
     fi
-    
+
     if [ -f "$target_dir/.download_complete" ]; then
         echo -e "${YELLOW}$model_name already downloaded. Skipping...${NC}"
         return 0
     fi
-    
+
     huggingface-cli download \
         --token "$HF_TOKEN" \
         --local-dir "$target_dir" \
         --local-dir-use-symlinks False \
         --resume-download \
         "$repo_id"
-    
+
     touch "$target_dir/.download_complete"
     echo -e "${GREEN}✓ $model_name downloaded successfully${NC}"
 }
@@ -57,9 +57,9 @@ download_model() {
 verify_checksums() {
     local model_name=$1
     local target_dir="$MODEL_DIR/$model_name"
-    
+
     echo -e "${BLUE}Verifying checksums for $model_name...${NC}"
-    
+
     local main_file=""
     case "$model_name" in
         "mistral-7b-awq")
@@ -72,7 +72,7 @@ verify_checksums() {
             main_file="model-00001-of-00003.safetensors"
             ;;
     esac
-    
+
     if [ -f "$target_dir/$main_file" ]; then
         local actual_sum=$(sha256sum "$target_dir/$main_file" | cut -d' ' -f1 | head -c 40)
         echo -e "${GREEN}✓ Main model file exists: $main_file${NC}"
@@ -85,21 +85,21 @@ verify_checksums() {
 main() {
     echo -e "${BLUE}=== Multimodal LLM Model Downloader ===${NC}"
     echo "Model directory: $MODEL_DIR"
-    
+
     if [ ! -d "$MODEL_DIR" ]; then
         echo -e "${YELLOW}Creating model directory: $MODEL_DIR${NC}"
         mkdir -p "$MODEL_DIR"
     fi
-    
+
     for model_name in "${!MODEL_CONFIGS[@]}"; do
         repo_id="${MODEL_CONFIGS[$model_name]}"
         download_model "$model_name" "$repo_id"
         verify_checksums "$model_name"
         echo ""
     done
-    
+
     echo -e "${GREEN}=== All models processed ===${NC}"
-    
+
     echo -e "\n${BLUE}Disk usage summary:${NC}"
     du -sh "$MODEL_DIR"/* 2>/dev/null || echo "No models downloaded yet"
 }

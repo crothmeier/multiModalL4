@@ -47,11 +47,11 @@ echo "  1. Get your token from https://huggingface.co/settings/tokens"
 echo "  2. Edit .env and replace 'hf_your_token_here' with your actual token"
 echo ""
 
-read -p "Do you have your HF_TOKEN ready? (y/N): " -n 1 -r
+read -r -p "Do you have your HF_TOKEN ready? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     read -p "Enter your HF_TOKEN: " token
-    if [ ! -z "$token" ]; then
+    if [ -n "$token" ]; then
         sed -i "s/hf_your_token_here/$token/" .env
         echo -e "${GREEN}✓ HF_TOKEN configured${NC}"
     fi
@@ -65,6 +65,7 @@ if [ ! -d "/mnt/models" ]; then
 fi
 
 echo -e "\n${BLUE}Verifying environment...${NC}"
+# shellcheck source=/dev/null
 source .env
 
 if [ -z "$HF_TOKEN" ] || [ "$HF_TOKEN" == "hf_your_token_here" ]; then
@@ -74,7 +75,7 @@ else
     echo -e "${GREEN}✓ HF_TOKEN is configured${NC}"
 fi
 
-if [ ! -z "$VLLM_API_KEY" ] && [ "$VLLM_API_KEY" != "your-secure-api-key" ]; then
+if [ -n "$VLLM_API_KEY" ] && [ "$VLLM_API_KEY" != "your-secure-api-key" ]; then
     echo -e "${GREEN}✓ VLLM_API_KEY is configured${NC}"
 else
     echo -e "${YELLOW}! VLLM_API_KEY using default (consider setting a secure key)${NC}"

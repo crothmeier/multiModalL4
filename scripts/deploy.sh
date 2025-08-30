@@ -402,7 +402,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --rollback)
             # Manual rollback
-            ROLLBACK_POINT=$(ls -t "$BACKUP_DIR" | head -1)
+            ROLLBACK_POINT="$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -printf "%T@ %f
+" | sort -nr | head -1 | cut -d" " -f2-)"
             if [[ -n "$ROLLBACK_POINT" ]]; then
                 ROLLBACK_POINT="$BACKUP_DIR/$ROLLBACK_POINT"
                 rollback

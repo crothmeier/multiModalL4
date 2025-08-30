@@ -1,37 +1,67 @@
+# === Compose backups ===
+docker-compose.yml.backup-*
+migrations/**/docker-compose.yml.backup-*
+
+# === Local environment & tokens ===
+.env
+.env.*
+.envrc
+*.pem
+*.key
+*.pfx
+*.jks
+token*
+hf_*
+
+# === Model artifacts ===
+models/
+*.gguf
+*.safetensors
+*.pt
+*.bin
+*.onnx
+*.ckpt
+*.npz
+*.npy
+*.tar
+*.zst
+*.gz
+*.zip
+*.parquet
+
 # === Python ===
 __pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
 *.py[cod]
 *.egg-info/
 .venv/
-.env
 .venv*/
-.env*/
 .Python
 
-# === Logs & runtime ===
+# === Caches & logs ===
+.cache/
 logs/
 *.log
 *.out
 *.err
 
-# === Docker & Compose ===
-# named volumes shouldn't be tracked
-volumes/
-docker-data/
+# === IDE ===
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# === Jupyter & Notebooks ===
+# === Jupyter ===
 .ipynb_checkpoints/
 
-# === System cruft ===
+# === System ===
 .DS_Store
 Thumbs.db
 
-# === Local scripts (exclude if not needed in repo) ===
-scripts/validate_structure.sh
-
-# === Model artifacts ===
-/mnt/models/
-/models/
-/checkpoints/
+# === Docker volumes ===
+volumes/
+docker-data/

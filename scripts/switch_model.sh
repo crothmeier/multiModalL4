@@ -43,33 +43,33 @@ start_model() {
     local profile=$1
     local port=$2
     local model_name=$3
-    
+
     echo -e "${BLUE}Starting $model_name...${NC}"
-    
+
     stop_all_models
-    
+
     check_gpu_memory
-    
+
     echo -e "${YELLOW}Loading model with profile: $profile${NC}"
-    docker compose --profile $profile up -d
-    
+    docker compose --profile "$profile" up -d
+
     echo -e "${YELLOW}Waiting for model to be ready...${NC}"
     local max_attempts=60
     local attempt=0
-    
+
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://localhost:$port/health > /dev/null 2>&1; then
+        if curl -s http://localhost:"$port"/health > /dev/null 2>&1; then
             echo -e "${GREEN}✓ $model_name is ready!${NC}"
             echo -e "${GREEN}API endpoint: http://localhost:$port${NC}"
             check_gpu_memory
             return 0
         fi
-        
+
         echo -n "."
         sleep 2
         attempt=$((attempt + 1))
     done
-    
+
     echo -e "\n${RED}✗ Model failed to start. Check logs:${NC}"
     echo "  docker compose logs --tail 50"
     return 1
